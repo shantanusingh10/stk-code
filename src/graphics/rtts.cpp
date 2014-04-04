@@ -77,6 +77,22 @@ RTT::RTT()
     glBindTexture(GL_TEXTURE_2D, DepthStencilTexture);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_STENCIL, res.Width, res.Height, 0, GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8, 0);
 
+    glGenTextures(1, &MSAARTT);
+    glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, MSAARTT);
+    glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, 8, GL_RGBA16F, res.Width, res.Height, GL_FALSE);
+
+    glGenTextures(1, &MSAADS);
+    glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, MSAADS);
+    glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, 8, GL_DEPTH_COMPONENT32F, res.Width, res.Height, GL_FALSE);
+    glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, 0);
+
+    glGenFramebuffers(1, &MSAAFBO);
+    glBindFramebuffer(GL_FRAMEBUFFER, MSAAFBO);
+    glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, MSAARTT, 0);
+    glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, MSAADS, 0);
+    GLenum result = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+    assert(result == GL_FRAMEBUFFER_COMPLETE_EXT);
+
     // All RTTs are currently RGBA16F mostly with stencil. The four tmp RTTs are the same size
     // as the screen, for use in post-processing.
 
@@ -130,7 +146,7 @@ RTT::RTT()
     glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_DEPTH_COMPONENT24, 1024, 1024, 4, 0, GL_DEPTH_COMPONENT, GL_FLOAT, 0);
     glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, shadowColorTex, 0);
     glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadowDepthTex, 0);
-    GLenum result = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+    result = glCheckFramebufferStatus(GL_FRAMEBUFFER);
     assert(result == GL_FRAMEBUFFER_COMPLETE_EXT);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }

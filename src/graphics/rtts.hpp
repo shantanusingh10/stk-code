@@ -100,6 +100,7 @@ public:
     unsigned getDepthStencilTexture() const { return DepthStencilTexture; }
     unsigned getRenderTarget(enum TypeRTT target) const { return RenderTargetTextures[target]; }
     unsigned getFBO(enum TypeFBO fbo) { return FrameBuffers[fbo]; }
+    unsigned MSAARTT, MSAAFBO, MSAADS;
 private:
     unsigned RenderTargetTextures[RTT_COUNT], FrameBuffers[FBO_COUNT];
     unsigned DepthStencilTexture;

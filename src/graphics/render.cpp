@@ -430,8 +430,11 @@ void IrrDriver::renderSolidFirstPass()
 
 void IrrDriver::renderSolidSecondPass()
 {
-    glBindFramebuffer(GL_FRAMEBUFFER, m_rtts->getFBO(FBO_COLORS));
-    glDepthMask(GL_FALSE);
+    glEnable(GL_MULTISAMPLE);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, m_rtts->MSAAFBO);
+    glDepthMask(GL_TRUE);
+    glClearColor(0., 0., 0., 0.);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     irr_driver->setPhase(SOLID_LIT_PASS);
     glEnable(GL_DEPTH_TEST);
@@ -447,6 +450,11 @@ void IrrDriver::renderSolidSecondPass()
         glTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_RGBA, swizzleMask);
     }
     m_scene_manager->drawAll(m_renderpass);
+
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, m_rtts->getFBO(FBO_COLORS));
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, m_rtts->MSAAFBO);
+    glBlitFramebuffer(0, 0, UserConfigParams::m_width, UserConfigParams::m_height, 0, 0, UserConfigParams::m_width, UserConfigParams::m_height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+    glDisable(GL_MULTISAMPLE);
 }
 
 void IrrDriver::renderTransparent()
