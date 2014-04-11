@@ -61,6 +61,7 @@ PFNGLBINDFRAMEBUFFERPROC glBindFramebuffer;
 PFNGLFRAMEBUFFERTEXTURE2DPROC glFramebufferTexture2D;
 PFNGLFRAMEBUFFERTEXTUREPROC glFramebufferTexture;
 PFNGLTEXIMAGE3DPROC glTexImage3D;
+PFNGLTEXSUBIMAGE3DPROC glTexSubImage3D;
 PFNGLGENERATEMIPMAPPROC glGenerateMipmap;
 PFNGLCHECKFRAMEBUFFERSTATUSPROC glCheckFramebufferStatus;
 PFNGLTEXIMAGE2DMULTISAMPLEPROC glTexImage2DMultisample;
@@ -207,6 +208,7 @@ void initGL()
     glFramebufferTexture2D = (PFNGLFRAMEBUFFERTEXTURE2DPROC)IRR_OGL_LOAD_EXTENSION("glFramebufferTexture2D");
     glFramebufferTexture = (PFNGLFRAMEBUFFERTEXTUREPROC)IRR_OGL_LOAD_EXTENSION("glFramebufferTexture");
     glTexImage3D = (PFNGLTEXIMAGE3DPROC)IRR_OGL_LOAD_EXTENSION("glTexImage3D");
+    glTexSubImage3D = (PFNGLTEXSUBIMAGE3DPROC)IRR_OGL_LOAD_EXTENSION("glTexSubImage3D");
     glGenerateMipmap = (PFNGLGENERATEMIPMAPPROC)IRR_OGL_LOAD_EXTENSION("glGenerateMipmap");
     glCheckFramebufferStatus = (PFNGLCHECKFRAMEBUFFERSTATUSPROC)IRR_OGL_LOAD_EXTENSION("glCheckFramebufferStatus");
     glTexImage2DMultisample = (PFNGLTEXIMAGE2DMULTISAMPLEPROC)IRR_OGL_LOAD_EXTENSION("glTexImage2DMultisample");
@@ -334,6 +336,42 @@ void transformTexturesTosRGB(irr::video::ITexture *tex)
     }
     glGenerateMipmap(GL_TEXTURE_2D);
     delete[] data;
+}
+
+std::map<irr::video::ITexture *, std::pair<GLuint, GLuint> > AlreadyMappedTexture;
+std::map<size_t, std::pair<GLuint, GLuint> > NonFilledTexArray;
+
+std::pair<GLuint, GLuint> InsertIntoTextureArray(irr::video::ITexture* tex)
+{
+    std::map<irr::video::ITexture *, std::pair<GLuint, GLuint> >::const_iterator It = AlreadyMappedTexture.find(tex);
+    if (It != AlreadyMappedTexture.end())
+        return It->second;
+    unsigned w = tex->getSize().Width, h = tex->getSize().Height;
+    // FIXME: not really reliable if we have > 8096 size texture
+    size_t key = w * 8096 + h;
+    std::map<size_t, std::pair<GLuint, GLuint> >::const_iterator It2 = NonFilledTexArray.find(key);
+
+    GLuint InternalFormat = tex->hasAlpha() ? GL_COMPRESSED_SRGB_ALPHA : GL_COMPRESSED_SRGB,
+        Format = tex->hasAlpha() ? GL_BGRA : GL_BGR;
+    if (It2 == NonFilledTexArray.end() || It2->second.second == 128)
+    {
+        GLuint newArrayTex;
+        glGenTextures(1, &newArrayTex);
+        glBindTexture(GL_TEXTURE_2D_ARRAY, newArrayTex);
+        glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, InternalFormat, w, h, 128, 0, Format, GL_UNSIGNED_BYTE, 0);
+        NonFilledTexArray[key] = std::pair<GLuint, GLuint>(newArrayTex, 0);
+    }
+    char *data = new char[w * h * 4];
+    memcpy(data, tex->lock(), w * h * 4);
+    tex->unlock();
+    std::pair<GLuint, GLuint> &ArraySlice = NonFilledTexArray[key];
+    glBindTexture(GL_TEXTURE_2D_ARRAY, ArraySlice.first);
+    glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, ArraySlice.second, w, h, 1, Format, GL_UNSIGNED_BYTE, (GLvoid*) data);
+    glGenerateMipmap(GL_TEXTURE_2D_ARRAY);
+    AlreadyMappedTexture[tex] = std::pair<GLuint, GLuint>(ArraySlice.first, ArraySlice.second);
+    ArraySlice.second++;
+    delete[] data;
+    return AlreadyMappedTexture[tex];
 }
 
 void setTexture(unsigned TextureUnit, GLuint TextureId, GLenum MagFilter, GLenum MinFilter, bool allowAF)

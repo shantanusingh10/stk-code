@@ -78,6 +78,7 @@ extern PFNGLBINDFRAMEBUFFERPROC glBindFramebuffer;
 extern PFNGLFRAMEBUFFERTEXTURE2DPROC glFramebufferTexture2D;
 extern PFNGLFRAMEBUFFERTEXTUREPROC glFramebufferTexture;
 extern PFNGLTEXIMAGE3DPROC glTexImage3D;
+extern PFNGLTEXSUBIMAGE3DPROC glTexSubImage3D;
 extern PFNGLGENERATEMIPMAPPROC glGenerateMipmap;
 extern PFNGLCHECKFRAMEBUFFERSTATUSPROC glCheckFramebufferStatus;
 extern PFNGLTEXIMAGE2DMULTISAMPLEPROC glTexImage2DMultisample;
@@ -159,7 +160,9 @@ GLint LoadProgram(Types ... args)
 GLuint getTextureGLuint(irr::video::ITexture *tex);
 GLuint getDepthTexture(irr::video::ITexture *tex);
 void transformTexturesTosRGB(irr::video::ITexture *tex);
+std::pair<GLuint, GLuint> InsertIntoTextureArray(irr::video::ITexture *tex);
 void blitFBO(GLuint Src, GLuint Dst, size_t width, size_t height);
+
 
 void draw2DImage(const irr::video::ITexture* texture, const irr::core::rect<s32>& destRect,
     const irr::core::rect<s32>& sourceRect, const irr::core::rect<s32>* clipRect,
