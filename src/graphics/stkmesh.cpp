@@ -286,9 +286,21 @@ void drawNormalPass(const GLMesh &mesh, const core::matrix4 & ModelMatrix, const
 	size_t count = mesh.IndexCount;
 
 	assert(mesh.textures[1]);
-    setTexture(0, getTextureGLuint(mesh.textures[1]), GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, true);
+    std::pair<GLuint, GLuint> TexArrayAndSlice = InsertIntoTextureArray(mesh.textures[1]);
 
-    MeshShader::NormalMapShader::setUniforms(ModelMatrix, InverseModelMatrix, 0);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D_ARRAY, TexArrayAndSlice.first);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+    int aniso = UserConfigParams::m_anisotropic;
+    if (aniso == 0) aniso = 1;
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, (float)aniso);
+//	setTexture(0, mesh.textures[1], GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, true);
+
+    MeshShader::NormalMapShader::setUniforms(ModelMatrix, InverseModelMatrix, 0, TexArrayAndSlice.second);
 
     assert(mesh.vao_first_pass);
 	glBindVertexArray(mesh.vao_first_pass);

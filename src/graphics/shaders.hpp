@@ -72,10 +72,10 @@ class NormalMapShader
 public:
     static GLuint Program;
     static GLuint attrib_position, attrib_texcoord, attrib_tangent, attrib_bitangent;
-    static GLuint uniform_MM, uniform_IMM, uniform_normalMap;
+    static GLuint uniform_MM, uniform_IMM, uniform_normalMap, uniform_slice;
 
     static void init();
-    static void setUniforms(const core::matrix4 &ModelMatrix, const core::matrix4 &InverseModelMatrix, unsigned TU_normalMap);
+    static void setUniforms(const core::matrix4 &ModelMatrix, const core::matrix4 &InverseModelMatrix, unsigned TU_normalMap, unsigned slice);
 };
 
 class InstancedObjectPass1Shader
