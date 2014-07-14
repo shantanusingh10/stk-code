@@ -1132,6 +1132,30 @@ void Kart::update(float dt)
     m_kart_gfx->update(dt);
     if (m_collision_particles) m_collision_particles->update(dt);
 
+        // Add a certain epsilon (0.3) to the height of the kart. This avoids
+    // problems of the ray being cast from under the track (which happened
+    // e.g. on tux tollway when jumping down from the ramp, when the chassis
+    // partly tunnels through the track). While tunneling should not be
+    // happening (since Z velocity is clamped), the epsilon is left in place
+    // just to be on the safe side (it will not hit the chassis itself).
+    Vec3 epsilon(0,0.3f,0);
+
+    // Make sure that the ray doesn't hit the kart. This is done by
+    // resetting the collision filter group, so that this collision
+    // object is ignored during raycasting.
+    short int old_group = 0;
+    if(m_body->getBroadphaseHandle())
+    {
+        old_group = m_body->getBroadphaseHandle()->m_collisionFilterGroup;
+        m_body->getBroadphaseHandle()->m_collisionFilterGroup = 0;
+    }
+
+    m_terrain_info->update(getTrans(), epsilon);
+    if(m_body->getBroadphaseHandle())
+    {
+        m_body->getBroadphaseHandle()->m_collisionFilterGroup = old_group;
+    }
+
     updatePhysics(dt);
     
     if(!m_controls.m_fire) m_fire_clicked = 0;
@@ -1172,29 +1196,6 @@ void Kart::update(float dt)
         new RescueAnimation(this, /*is_auto_rescue*/true);
     }
 
-    // Add a certain epsilon (0.3) to the height of the kart. This avoids
-    // problems of the ray being cast from under the track (which happened
-    // e.g. on tux tollway when jumping down from the ramp, when the chassis
-    // partly tunnels through the track). While tunneling should not be
-    // happening (since Z velocity is clamped), the epsilon is left in place
-    // just to be on the safe side (it will not hit the chassis itself).
-    Vec3 epsilon(0,0.3f,0);
-
-    // Make sure that the ray doesn't hit the kart. This is done by
-    // resetting the collision filter group, so that this collision
-    // object is ignored during raycasting.
-    short int old_group = 0;
-    if(m_body->getBroadphaseHandle())
-    {
-        old_group = m_body->getBroadphaseHandle()->m_collisionFilterGroup;
-        m_body->getBroadphaseHandle()->m_collisionFilterGroup = 0;
-    }
-
-    m_terrain_info->update(getTrans(), epsilon);
-    if(m_body->getBroadphaseHandle())
-    {
-        m_body->getBroadphaseHandle()->m_collisionFilterGroup = old_group;
-    }
     handleMaterialGFX();
     const Material* material=m_terrain_info->getMaterial();
     if (!material)   // kart falling off the track
@@ -2026,7 +2027,8 @@ void Kart::updatePhysics(float dt)
         btVector3 terrain_up = m_body->getGravity();
         float g = World::getWorld()->getTrack()->getGravity();
         // Normalize the gravity, g is the length of the vector
-        btVector3 new_up = 0.9f * kart_up + 0.1f * terrain_up/-g;
+        float f = 0.8f;
+        btVector3 new_up = f * kart_up + (1.0f-f) * terrain_up/-g;
         // Get the rotation (hpr) based on current heading.
         Vec3 rotation(getHeading(), new_up);
         btMatrix3x3 m;
@@ -2041,23 +2043,58 @@ void Kart::updatePhysics(float dt)
         m_body->setCenterOfMassTransform(new_trans);
     }
 
-    // To avoid tunneling (which can happen on long falls), clamp the
-    // velocity in Y direction. Tunneling can happen if the Y velocity
-    // is larger than the maximum suspension travel (per frame), since then
-    // the wheel suspension can not stop/slow down the fall (though I am
-    // not sure if this is enough in all cases!). So the speed is limited
-    // to suspensionTravel / dt with dt = 1/60 (since this is the dt
-    // bullet is using).
 
     // Only apply if near ground instead of purely based on speed avoiding
     // the "parachute on top" look.
-    const Vec3 &v = m_body->getLinearVelocity();
-    if(/*isNearGround() &&*/ v.getY() < - m_kart_properties->getSuspensionTravelCM()*0.01f*60)
+    if(m_vehicle->getNumWheelsOnGround()==0)
     {
-        Vec3 v_clamped = v;
-        // clamp the speed to 99% of the maxium falling speed.
-        v_clamped.setY(-m_kart_properties->getSuspensionTravelCM()*0.01f*60 * 0.99f);
-        //m_body->setLinearVelocity(v_clamped);
+        const Vec3 &gravity = m_body->getGravity();
+
+        // First determine how far the kart is away from the terrain. Project
+        // the difference between position and terrain hit point onto the
+        // gravity to determine how high the kart is above the terrain.
+        Vec3 dist = m_terrain_info->getHitPoint() - getXYZ();
+        // The norm of the gravity is always the same as the track's 
+        // gravity value, so save computing the norm.
+        float g = World::getWorld()->getTrack()->getGravity();
+        Vec3 n = -getTrans().getBasis().getColumn(1);
+        float height = dist.dot(n);
+
+        // Now project the velocity onto gravity, to determine
+        // if the kart might hit the terrain:
+        float v = getVelocity().dot(n);
+
+        // The maximum height above terrain at which the physics will consider
+        // the kart to touch the ground: maximum suspension plus wheel radius:
+        float hat = m_kart_properties->getSuspensionRest()
+                  + m_kart_properties->getSuspensionTravelCM()*0.01f
+                  + m_kart_properties->getWheelRadius();
+
+        // v*dt is approximately the amount the kart is going to fall.
+        // If the kart is going to fall enough to touch the ground (or even
+        // if the kart would go through the terrain), slow it down to a 
+        // soft landing.
+        if(v * dt > height - hat && v>5.0f)
+        {
+            float delta_v = (height-hat)/dt - v;
+            btVector3 new_vv = n * delta_v;
+            const btVector3 old_v = m_body->getLinearVelocity();
+            if(old_v.getY() + new_vv.getY()>0)
+                new_vv.setY(-old_v.getY());
+            //if(new_vv.getY()>3)
+            {
+                m_body->setLinearVelocity(m_body->getLinearVelocity() + new_vv);
+                m_body->setInterpolationLinearVelocity(m_body->getInterpolationLinearVelocity() + new_vv);
+            }
+            Log::verbose("hat", "%f height %f v %f dt %f dist %f Vyold %f deltav %f xyz %f %f %f hp %f %f %f",
+                hat, height, v, dt, dist,
+                old_v.getY(), delta_v,
+                getXYZ().getX(), getXYZ().getY(), getXYZ().getZ(),
+                m_terrain_info->getHitPoint().getX(),
+                m_terrain_info->getHitPoint().getY(),
+                m_terrain_info->getHitPoint().getZ()
+            );
+        }
     }
 
     //at low velocity, forces on kart push it back and forth so we ignore this

@@ -380,12 +380,23 @@ void btKart::updateVehicle( btScalar step )
 
     m_num_wheels_on_ground       = 0;
     m_visual_wheels_touch_ground = true;
+    int count_max_suppressed     = 0;
     for (int i=0;i<m_wheelInfo.size();i++)
     {
         btScalar depth;
         depth = rayCast( i);
         if(m_wheelInfo[i].m_raycastInfo.m_isInContact)
             m_num_wheels_on_ground++;
+        if(m_wheelInfo[i].m_raycastInfo.m_suspensionLength < 0.011f)
+            count_max_suppressed++;
+    }
+    if(count_max_suppressed==4)
+    {
+        btVector3 v = m_chassisBody->getLinearVelocity();
+        v.setY(0);
+        //m_chassisBody->setLinearVelocity(v);
+        //m_chassisBody->setInterpolationLinearVelocity(v);
+        //m_chassisBody->clearForces();
     }
     // Work around: make sure that either both wheels on one axis
     // are on ground, or none of them. This avoids the problem of
