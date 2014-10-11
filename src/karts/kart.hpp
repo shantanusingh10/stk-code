@@ -152,6 +152,8 @@ private:
     /** Counter which is used for displaying wrong way message after a delay */
     float        m_wrongway_counter;
 
+	/** The owner (kart) for sticky gum achievement */
+	AbstractKart*               m_owner;
 
     // Bullet physics parameters
     // -------------------------
@@ -263,6 +265,8 @@ public:
     virtual const Material *getLastMaterial() const;
     /** Returns the pitch of the terrain depending on the heading. */
     virtual float getTerrainPitch(float heading) const;
+	/**sets the owner of the bubble gum for sticky gum achievement */
+	virtual void  setOwner(AbstractKart* kart){ m_owner = kart; }
 
     virtual void   reset            ();
     virtual void   handleZipper     (const Material *m=NULL,

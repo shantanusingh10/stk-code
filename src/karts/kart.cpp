@@ -19,6 +19,7 @@
 
 #include "karts/kart.hpp"
 
+#include "achievements/achievement_info.hpp"
 #include "audio/music_manager.hpp"
 #include "audio/sfx_manager.hpp"
 #include "audio/sfx_base.hpp"
@@ -916,24 +917,31 @@ void Kart::collectedItem(Item *item, int add_info)
             m_powerup->hitBonusBox(*item, add_info);
             break;
         }
-    case Item::ITEM_BUBBLEGUM:
+	case Item::ITEM_BUBBLEGUM:
+    { 
         m_has_caught_nolok_bubblegum = (item->getEmitter() != NULL &&
-                                    item->getEmitter()->getIdent() == "nolok");
+		item->getEmitter()->getIdent() == "nolok");
 
-        // slow down
-        m_bubblegum_time = m_kart_properties->getBubblegumTime();
-        m_bubblegum_torque = (rand()%2)
-                           ?  m_kart_properties->getBubblegumTorque()
-                           : -m_kart_properties->getBubblegumTorque();
-        m_max_speed->setSlowdown(MaxSpeed::MS_DECREASE_BUBBLE,
-                                 m_kart_properties->getBubblegumSpeedFraction(),
-                                 m_kart_properties->getBubblegumFadeInTime(),
-                                 m_bubblegum_time);
-        m_goo_sound->position(getXYZ());
-        m_goo_sound->play();
-        // Play appropriate custom character sound
-        playCustomSFX(SFXManager::CUSTOM_GOO);
-        break;
+	StateManager::ActivePlayer * player = m_owner->getController()->getPlayer();
+    if (player != NULL && player->getConstProfile() == PlayerManager::getCurrentPlayer())
+    {
+         PlayerManager::increaseAchievement(AchievementInfo::ACHIEVE_GUM, "gum");
+    }
+	// slow down
+	m_bubblegum_time = m_kart_properties->getBubblegumTime();
+	m_bubblegum_torque = (rand() % 2)
+		? m_kart_properties->getBubblegumTorque()
+		: -m_kart_properties->getBubblegumTorque();
+	m_max_speed->setSlowdown(MaxSpeed::MS_DECREASE_BUBBLE,
+		m_kart_properties->getBubblegumSpeedFraction(),
+		m_kart_properties->getBubblegumFadeInTime(),
+		m_bubblegum_time);
+	m_goo_sound->position(getXYZ());
+	m_goo_sound->play();
+	// Play appropriate custom character sound
+	playCustomSFX(SFXManager::CUSTOM_GOO);
+	break;
+	}
     default        : break;
     }   // switch TYPE
 
